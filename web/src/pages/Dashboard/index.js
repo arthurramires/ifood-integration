@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import api from '../../services/api';
 import axios from 'axios';
 import { isAfter } from 'date-fns';
+import schedule from 'node-schedule';
 import { 
   Container, OrdersContainer, Order, 
   OrderName, OrderTime, OrderStatus, 
@@ -13,23 +14,42 @@ import {
 
 const Dashboard = () => {
   const [orders, setOrders] = useState([]);
+  const [events, setEvents] = useState([]);
   const [date, setDate] = useState(new Date());
 
   const getToken = useCallback(async() => {
-    const token = await localStorage.getItem('restaurant:token');
+    const token = localStorage.getItem('restaurant:token');
     return token;
   }, []);
 
-  useEffect(() => {
-    // if (isAfter(date, new Date())){
-    //   axios.get('https://pos-api.ifood.com.br/v1.0/events%3Apolling', {
+  //Pega informações dos pedidos que possuem Status PLACED
+  const requestOrders = useCallback(() => {
+    events.map(async (event) => {
+      if (event.code === 'PLACED'){
+        await axios.get(`https://pos-api.ifood.com.br/v2.0/orders/${event}`, {
+          headers: {
+            'Authorization': getToken(),
+          },
+        }).then(response => {
+          setOrders(response.data)
+        });
+      }
+    });
+  }, [events, getToken]);
+
+  //Polling precisa ser executado a todo momento para pegar os eventos
+  schedule.scheduleJob('* * * * *', function(){
+    // axios.get('https://pos-api.ifood.com.br/v1.0/events%3Apolling', {
     //     headers: {
     //       'Authorization': getToken(),
     //     }
-    //   });
-    // }
-  }, [date, getToken]);
-
+    // }).then(response => {
+    //     setEvents(response.data);
+    // });
+    // requestOrders();
+  });
+  
+  //Salva os pedidos no banco de dados da Gestor Food
   const handleCreateOrder = useCallback(async(data) => {
     await api.post('/orders', {
             reference: data.reference,
@@ -68,12 +88,23 @@ const Dashboard = () => {
 
 
   const handleAcceptOrder = useCallback((id) => {
-    handleCreateOrder(null);
-  }, [handleCreateOrder]);
+    const createOrder = orders.find(order => order.reference === id);
+    handleCreateOrder(createOrder);
+  }, [handleCreateOrder, orders]);
 
+  //Solicita cancelamento do pedido
   const handleDeclineOrder = useCallback((id) => {}, []);
 
-  const handleDelivery = useCallback((id) => {}, []);
+  //Informa que o pedido saiu para entrega
+  const handleDelivery = useCallback((id) => {
+    // axios.get(`https://pos-api.ifood.com.br/v1.0/orders/${id}/tracking`, {
+    // //     headers: {
+    // //       'Authorization': getToken(),
+    // //     }
+    // //   }).then(response => {
+    // //     setEvents(response.data);
+    // //   });
+  }, []);
 
   
   return (
@@ -100,6 +131,75 @@ const Dashboard = () => {
             <AcceptOrder>Aceitar Pedido</AcceptOrder>
             <DeclineOrder>Cancelar Pedido</DeclineOrder>
             <DeliveryButton>Saiu para entrega</DeliveryButton>
+          </OrderActions>
+        </Order>
+
+        <Order>
+          <OrderInfo>
+            <OrderName>Batata Frita com molho</OrderName>
+            <OrderTime>Pedido realizado às 18h</OrderTime>
+            <OrderStatus>Status: Em preparo</OrderStatus>
+            <OrderClient>Cliente: Arthur Ramires</OrderClient>
+            <OrderClientPhone>Telefone: (67) 9 9232-7947</OrderClientPhone>
+            <OrderItems>
+              <OrderItemsTitle>Itens</OrderItemsTitle>
+              <OrderItemsQuantity>Batata Frita x 4</OrderItemsQuantity>
+              <OrderItemsPrice>Preço unitário: R$ 10.00</OrderItemsPrice>
+            </OrderItems>
+            <OrderDeliveryFee>Taxa de entrega: Grátis</OrderDeliveryFee>
+            <OrderTotal>Total: R$ 40.00</OrderTotal>
+          </OrderInfo>
+          <OrderActions>
+            <OrderActionsTitle>Ações</OrderActionsTitle>
+            <AcceptOrder>Aceitar Pedido</AcceptOrder>
+            <DeclineOrder>Cancelar Pedido</DeclineOrder>
+            <DeliveryButton>Saiu para entrega</DeliveryButton>
+          </OrderActions>
+        </Order>
+
+        <Order>
+          <OrderInfo>
+            <OrderName>Batata Frita com molho</OrderName>
+            <OrderTime>Pedido realizado às 18h</OrderTime>
+            <OrderStatus>Status: Em preparo</OrderStatus>
+            <OrderClient>Cliente: Arthur Ramires</OrderClient>
+            <OrderClientPhone>Telefone: (67) 9 9232-7947</OrderClientPhone>
+            <OrderItems>
+              <OrderItemsTitle>Itens</OrderItemsTitle>
+              <OrderItemsQuantity>Batata Frita x 4</OrderItemsQuantity>
+              <OrderItemsPrice>Preço unitário: R$ 10.00</OrderItemsPrice>
+            </OrderItems>
+            <OrderDeliveryFee>Taxa de entrega: Grátis</OrderDeliveryFee>
+            <OrderTotal>Total: R$ 40.00</OrderTotal>
+          </OrderInfo>
+          <OrderActions>
+            <OrderActionsTitle>Ações</OrderActionsTitle>
+            <AcceptOrder onClick={() => handleAcceptOrder('id_do_pedido')}>Aceitar Pedido</AcceptOrder>
+            <DeclineOrder onClick={() => handleDeclineOrder('id_do_pedido')}>Cancelar Pedido</DeclineOrder>
+            <DeliveryButton onClick={() => handleDelivery('id_do_pedido')}>Saiu para entrega</DeliveryButton>
+          </OrderActions>
+        </Order>
+
+        <Order>
+          <OrderInfo>
+            <OrderName>Batata Frita com molho</OrderName>
+            <OrderTime>Pedido realizado às 18h</OrderTime>
+            <OrderStatus>Status: Em preparo</OrderStatus>
+            <OrderClient>Cliente: Arthur Ramires</OrderClient>
+            <OrderClientPhone>Telefone: (67) 9 9232-7947</OrderClientPhone>
+            <OrderItems>
+              <OrderItemsTitle>Itens</OrderItemsTitle>
+              <OrderItemsQuantity>Batata Frita x 4</OrderItemsQuantity>
+              <OrderItemsPrice>Preço unitário: R$ 10.00</OrderItemsPrice>
+            </OrderItems>
+            <OrderDeliveryFee>Taxa de entrega: Grátis</OrderDeliveryFee>
+            <OrderTotal>Total: R$ 40.00</OrderTotal>
+          </OrderInfo>
+          <OrderActions>
+            <OrderActionsTitle>Ações</OrderActionsTitle>
+            <AcceptOrder onClick={() => handleAcceptOrder('id_do_pedido')}>Aceitar Pedido</AcceptOrder>
+            <DeclineOrder onClick={() => handleDeclineOrder('id_do_pedido')}>Cancelar Pedido</DeclineOrder>
+            <DeliveryButton onClick={() => handleDelivery('id_do_pedido')}>Saiu para entrega</DeliveryButton>
           </OrderActions>
         </Order>
 

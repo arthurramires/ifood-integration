@@ -6,25 +6,25 @@ export const Container = styled.div`
 `;
 
 export const Title = styled.h1`
-    display: flex;
     padding: 60px;
+    margin: 0 auto;
 `;
 
 export const OrdersContainer = styled.div`
     background: #FFF;
     height: 100%;
-    width: 100%;
     padding: 20px;
     border-radius: 4px;
     display: flex;
     flex-direction: row;
-    justify-content: center;
+    overflow-x: scroll;
 `;
 
 export const Order = styled.div`
     background: #FFF;
     height: 100%;
     width: 600px;
+    min-width: 500px;
     border: 1px solid #FF9000;
     padding: 8px;
     display: flex;
