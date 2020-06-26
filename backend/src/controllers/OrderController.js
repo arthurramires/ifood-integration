@@ -6,13 +6,18 @@ const SubItem = require('../models/SubItem');
 module.exports = {
     async index(request, response){
         const orders = await Order.findAll({
-            include: {
-                model: Payment,
-                as: 'payment',
-                attributes: ['id', 'name', 'code', 'issuer', 'prepaId']
-            }
+            include: [
+                {
+                    model: Customer,
+                    as: 'customer',
+                },
+                {
+                    model: Item,
+                    as: 'item'
+                }
+            ]
         });
-
+        
         return response.json(orders);
     },
     async create(request, response){

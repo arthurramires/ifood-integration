@@ -18,7 +18,7 @@ class Item extends Model {
 
   static associate(models) {
     this.belongsTo(models.Order, { foreignKey: 'order_id', as: 'order' });
-    this.hasMany(models.SubItem);
+    this.hasMany(models.SubItem, { as: 'subItem' });
   }
 }
 
