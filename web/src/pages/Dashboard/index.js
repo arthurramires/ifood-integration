@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import api from '../../services/api';
 import axios from 'axios';
-import { isAfter } from 'date-fns';
 import schedule from 'node-schedule';
 import { 
   Container, OrdersContainer, Order, 
@@ -17,39 +16,74 @@ const Dashboard = () => {
   const [events, setEvents] = useState([]);
   const [date, setDate] = useState(new Date());
 
-  const getToken = useCallback(async() => {
-    const token = localStorage.getItem('restaurant:token');
-    return token;
+  const getToken = useCallback(() => {
+    return localStorage.getItem('restaurant:token');
   }, []);
 
+  //Informa ao IFood que o pedido foi confirmado pelo e-PDV
+  //[x]
+  const handleConfirmOrder = useCallback(async (correlationId) => {
+    await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${correlationId}/statuses/integration`,{
+        headers: {
+          'Authorization': getToken(),
+        }
+    });
+    await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${correlationId}/statuses/confirmation`,{
+        headers: {
+          'Authorization': getToken(),
+        }
+    });
+  }, [getToken]);
+
   //Pega informações dos pedidos que possuem Status PLACED
+  //[]
   const requestOrders = useCallback(() => {
     events.map(async (event) => {
       if (event.code === 'PLACED'){
-        await axios.get(`https://pos-api.ifood.com.br/v2.0/orders/${event}`, {
+        await axios.get(`https://pos-api.ifood.com.br/v2.0/orders/${event.correlationId}`, {
           headers: {
-            'Authorization': getToken(),
+            'Authorization': 'Bearer' + getToken(),
           },
         }).then(response => {
+          //Informa ao IFood que o pedido foi integrado e confirmado pelo e-PDV.
+          handleConfirmOrder(event.correlationId);
           setOrders(response.data)
         });
       }
     });
+  }, [events, getToken, handleConfirmOrder]);
+
+  const handleAcknowledgment = useCallback(() => {
+    if (events.length !== 0){
+      const idEvents = events.map(event => {
+        return event.correlationId;
+      });
+  
+      axios.post('https://pos-api.ifood.com.br/v1.0/events/acknowledgment', idEvents, {
+        headers: {
+          'Authorization': 'Bearer' + getToken(),
+        }
+      });    
+    }   
   }, [events, getToken]);
 
   //Polling precisa ser executado a todo momento para pegar os eventos
-  schedule.scheduleJob('* * * * *', function(){
-    // axios.get('https://pos-api.ifood.com.br/v1.0/events%3Apolling', {
-    //     headers: {
-    //       'Authorization': getToken(),
-    //     }
-    // }).then(response => {
-    //     setEvents(response.data);
-    // });
-    // requestOrders();
+  //[x]
+  schedule.scheduleJob('*/30 * * * * *', function(){
+    axios.get('https://pos-api.ifood.com.br/v1.0/events%3Apolling', {
+        headers: {
+          'Authorization': 'Bearer' + getToken(),
+        }
+    }).then(response => {
+      console.log(response)
+        // setEvents(response.data);
+        // handleAcknowledgment();
+    });
+    //requestOrders();
   });
   
   //Salva os pedidos no banco de dados da Gestor Food
+  //[]
   const handleCreateOrder = useCallback(async(data) => {
     await api.post('/orders', {
             reference: data.reference,
@@ -84,8 +118,9 @@ const Dashboard = () => {
                 complement: data.deliveryAddress.complement
             },
     });
-  }, []);
 
+    alert('O pedido selecionado acaba de ser salvo no banco de dados Gestor Food!');
+  }, []);
 
   const handleAcceptOrder = useCallback((id) => {
     const createOrder = orders.find(order => order.reference === id);
@@ -93,16 +128,16 @@ const Dashboard = () => {
   }, [handleCreateOrder, orders]);
 
   //Solicita cancelamento do pedido
+  //[]
   const handleDeclineOrder = useCallback((id) => {}, []);
 
   //Informa que o pedido saiu para entrega
+  //[]
   const handleDelivery = useCallback((id) => {
-    // axios.get(`https://pos-api.ifood.com.br/v1.0/orders/${id}/tracking`, {
+    // axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/dispatch`, {
     // //     headers: {
     // //       'Authorization': getToken(),
     // //     }
-    // //   }).then(response => {
-    // //     setEvents(response.data);
     // //   });
   }, []);
 
@@ -111,7 +146,42 @@ const Dashboard = () => {
     <Container>
       <Title>Dashboard</Title>
       <OrdersContainer>
-        <Order>
+        {orders.length === 0 
+          ? <h1>Nenhum pedido recebido...</h1> 
+          : orders.map(order => (
+            <Order>
+              <OrderInfo>
+                <OrderName>{order.name}</OrderName>
+                <OrderTime>{order.createdAt}</OrderTime>
+                <OrderStatus>Status: Em preparo</OrderStatus>
+                <OrderClient>Cliente: {order.customer.name}</OrderClient>
+                <OrderClientPhone>Telefone: {order.customer.phone}</OrderClientPhone>
+                {orders.items.map(item => (
+                    <OrderItems>
+                      <OrderItemsTitle>Itens</OrderItemsTitle>
+                      <OrderItemsQuantity>{item.name} x {item.quantity}</OrderItemsQuantity>
+                      <OrderItemsPrice>Preço unitário: {item.price}</OrderItemsPrice>
+                      {item.subItems.map(subItem => (
+                        <>
+                          <OrderItemsQuantity>{subItem.name} x {subItem.quantity}</OrderItemsQuantity>
+                          <OrderItemsPrice>Preço unitário: R$ {subItem.price}</OrderItemsPrice>
+                        </>
+                      ))}
+                    </OrderItems>
+                ))}
+                <OrderDeliveryFee>Taxa de entrega: {order.deliveryFee}</OrderDeliveryFee>
+                <OrderTotal>Total: R$ {order.totalPrice}</OrderTotal>
+              </OrderInfo>
+              <OrderActions>
+                <OrderActionsTitle>Ações</OrderActionsTitle>
+                <AcceptOrder onClick={() => handleAcceptOrder(order.reference)}>Aceitar Pedido</AcceptOrder>
+                <DeclineOrder onClick={() => handleDeclineOrder(order.reference)}>Cancelar Pedido</DeclineOrder>
+                <DeliveryButton onClick={() => handleDelivery(order.reference)}>Saiu para entrega</DeliveryButton>
+              </OrderActions>
+            </Order>
+          ))
+        }
+        {/* <Order>
           <OrderInfo>
             <OrderName>Batata Frita com molho</OrderName>
             <OrderTime>Pedido realizado às 18h</OrderTime>
@@ -224,7 +294,7 @@ const Dashboard = () => {
             <DeclineOrder onClick={() => handleDeclineOrder('id_do_pedido')}>Cancelar Pedido</DeclineOrder>
             <DeliveryButton onClick={() => handleDelivery('id_do_pedido')}>Saiu para entrega</DeliveryButton>
           </OrderActions>
-        </Order>
+        </Order> */}
       </OrdersContainer>
     </Container>
   );
