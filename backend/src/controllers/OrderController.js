@@ -21,85 +21,37 @@ module.exports = {
         return response.json(orders);
     },
     async create(request, response){
-        //const { order_data } = request.body;
+        const  order_data  = request.body;
         let itemId = [];
         const data = {
-            reference: 31,
-            createdAt: "2020-06-25T11:39:00+00:00",
-            type: "DELIVERY",
-            deliveryFee: 5,
-            subTotal: 20.0,
-            totalPrice: 25,
-            payments: [
-                {
-                    name: "Nome da forma de pagamento",
-                    code: "Codigo da forma de pagamento⁎⁎⁎",
-                    value: 20.0,
-                    prepaId: false,
-                    issuer: "Elo"
-                },
-                {
-                    name: "Nome da forma de pagamento",
-                    code: "Codigo da forma de pagamento⁎⁎⁎",
-                    value: 20.0,
-                    prepaId: false,
-                    issuer: "Mastercard"
-                }
-            ],
+            reference: order_data.reference,
+            createdAt: order_data.createdAt,
+            type: order_data.type,
+            deliveryFee: order_data.deliveryFee,
+            subTotal: order_data.subTotal,
+            totalPrice: order_data.totalPrice,
+            payments: order_data.payments,
             customer: {
-                name: "Nome do cliente",
-                taxPayerIdentificationNumber: "1234556",
-                phone: "67992327947",
-                email: "arthurramires@gmail.com",
-                
+                name: order_data.customer.name,
+                taxPayerIdentificationNumber: order_data.customer.taxPayerIdentificationNumber,
+                phone: order_data.customer.phone,
+                email: 'Não fornecido',
             },
-            items: [
-                {
-                    name: "Nome do item",
-                    quantity: 2,
-                    price: 10,
-                    subItemsPrice: 5,
-                    totalPrice: 20,
-                    subItems: [
-                        {
-                            name: "Sub item1",
-                            quantity: 1,
-                            price: 1,
-                            totalPrice: 2,
-                        }
-                    ]
-                },
-                {
-                    name: "Nome do item",
-                    quantity: 2,
-                    price: 10,
-                    subItemsPrice: 5,
-                    totalPrice: 20,
-                    subItems: [
-                        {
-                            name: "sub item 2",
-                            quantity: 1,
-                            price: 1,
-                            totalPrice: 2,
-                        }
-                    ]
-                },
-            ],
+            items: order_data.items,
             deliveryAddress: {
-                formattedAddress: "Endereço formatado",
-                country: "Pais",
-                state: "Estado",
-                city: "Cidade",
-                neighborhood: "Bairro",
-                streetName: "Endereço (Tipo logradouro + Logradouro)",
-                streetNumber: 112,
-                postalCode: "CEP",
+                formattedAddress: order_data.deliveryAddress.formattedAddress,
+                country: order_data.deliveryAddress.country,
+                state: order_data.deliveryAddress.state,
+                city: order_data.deliveryAddress.city,
+                neighborhood: order_data.deliveryAddress.neighborhood,
+                streetName: order_data.deliveryAddress.streetName,
+                streetNumber: order_data.deliveryAddress.streetNumber,
+                postalCode: order_data.deliveryAddress.postalCode,
                 coordinates: {
-                    latitude: -20.5330711,
-                    longitude: -54.5985399
+                    latitude: order_data.deliveryAddress.coordinates.latitude,
+                    longitude: order_data.deliveryAddress.coordinates.longitude
                 },
-                reference: "Referencia",
-                complement: "Complemento do endereço"
+                complement: order_data.deliveryAddress.complement
             },
         }
 
@@ -118,7 +70,7 @@ module.exports = {
             streetName: data.deliveryAddress.streetName,
             streetNumber: data.deliveryAddress.streetNumber,
             postalCode: data.deliveryAddress.postalCode,
-            reference: data.deliveryAddress.reference,
+            reference: data.deliveryAddress.neighborhood,
             complement: data.deliveryAddress.complement
         }).then(response => {
             Order.create({
@@ -127,45 +79,45 @@ module.exports = {
                 subTotal: data.subTotal, 
                 deliveryFee: data.deliveryFee, 
                 type: data.type,
+            }).then(responseOrder => {
+                for (let i = 0; i < data.payments.length; i++){
+                    Payment.create({
+                        order_id: responseOrder.id,
+                        name: data.payments[i].name,
+                        code: data.payments[i].code,
+                        value: data.payments[i].value,
+                        issuer: data.payments[i].issuer,
+                        prepaId: data.payments[i].prepaid,
+                    });
+                }
+
+                for (let i = 0; i < data.items.length; i++){
+                    Item.create({
+                        order_id: responseOrder.id,
+                        name: data.items[i].name,
+                        quantity: data.items[i].quantity,
+                        price: data.items[i].price,
+                        subItemsPrice: data.items[i].subItemsPrice,
+                        totalPrice: data.items[i].totalPrice,
+                    }).then(response => {
+                        if (response.subItemsPrice !== 0){
+                            for (let j = 0; j < data.items[i].subItems.length; j++){
+                                SubItem.create({
+                                    item_id: response.id,
+                                    name: data.items[i].subItems[j].name,
+                                    quantity: data.items[i].subItems[j].quantity,
+                                    price: data.items[i].subItems[j].price,
+                                    totalPrice: data.items[i].subItems[j].totalPrice,
+                                });
+                            }
+                        }
+                    });
+        
+                    
+                }
             });
         });
 
-        for (let i = 0; i < data.payments.length; i++){
-            await Payment.create({
-                order_id: data.reference,
-                name: data.payments[i].name,
-                code: data.payments[i].code,
-                value: data.payments[i].value,
-                issuer: data.payments[i].issuer,
-                prepaId: data.payments[i].prepaId,
-            });
-        }
-
-        for (let i = 0; i < data.items.length; i++){
-            await Item.create({
-                order_id: data.reference,
-                name: data.items[i].name,
-                quantity: data.items[i].quantity,
-                price: data.items[i].price,
-                subItemsPrice: data.items[i].subItemsPrice,
-                totalPrice: data.items[i].totalPrice,
-            }).then(response => {
-                itemId.push(response.dataValues.id)
-            });
-
-            for (let j = 0; j < data.items[i].subItems.length; j++){
-                SubItem.create({
-                    item_id: itemId[i],
-                    name: data.items[i].subItems[j].name,
-                    quantity: data.items[i].subItems[j].quantity,
-                    price: data.items[i].subItems[j].price,
-                    totalPrice: data.items[i].subItems[j].totalPrice,
-                });
-            }
-        }
-            
-        
-        
         
         return response.json({});
     }
