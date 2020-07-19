@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { Form } from '@unform/web';
 import { useHistory } from 'react-router-dom';
 import axios from 'axios';
+import api from '../../services/api';
 
 import Input from '../../components/Input';
 import { Container, FormContainer, FormTitle, FormButton } from './styles';
@@ -9,7 +10,7 @@ import { Container, FormContainer, FormTitle, FormButton } from './styles';
 const Credentials = () => {
   const history = useHistory();
 
-  const handleSubmit = useCallback((credentials) => {
+  const handleSubmit = useCallback(async (credentials) => {
     var data = new FormData();
     data.append("client_id", 'gestor_food');
     data.append("client_secret", 'dPrWrJ5n');
@@ -17,9 +18,11 @@ const Credentials = () => {
     data.append("username", credentials.username);
     data.append("password", credentials.password);
 
-    axios.post('https://pos-api.ifood.com.br/oauth/token', data).then(response => {
+    await axios.post('https://pos-api.ifood.com.br/oauth/token', data).then(response => {
       localStorage.setItem('restaurant:token', response.data.access_token);
     });
+
+    
 
     history.push('/dashboard');
   }, [history]);
