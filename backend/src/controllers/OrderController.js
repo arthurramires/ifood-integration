@@ -71,7 +71,7 @@ module.exports = {
             streetNumber: data.deliveryAddress.streetNumber,
             postalCode: data.deliveryAddress.postalCode,
             reference: data.deliveryAddress.neighborhood,
-            complement: data.deliveryAddress.complement
+            complement: data.deliveryAddress.complement || 'Nenhum'
         }).then(response => {
             Order.create({
                 customer_id: response.dataValues.id,
