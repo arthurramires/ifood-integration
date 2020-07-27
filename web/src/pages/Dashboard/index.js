@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import api from '../../services/api';
 import axios from 'axios';
-import schedule from 'node-schedule';
 import { parseISO, format } from 'date-fns';
 import ptBR from 'date-fns/locale/pt-BR'
+import schedule from 'node-schedule';
 import { 
   Container, OrdersContainer, Order, 
-  OrderName, OrderTime, OrderStatus, 
+  OrderName, OrderTime, 
   OrderClient, OrderClientPhone, OrderItems, 
   OrderItemsTitle, OrderItemsQuantity, OrderItemsPrice,
   OrderDeliveryFee, OrderTotal, OrderInfo,
@@ -44,27 +44,14 @@ const Dashboard = () => {
 
         idEvents = []
 
-        if (event.code === 'INTEGRATED'){
+        if (event.code === 'INTEGRATED'|| event.code === 'CONFIRMED' ){//Mudar para PLACED quando liberarem acesso
           await axios.get(`https://pos-api.ifood.com.br/v2.0/orders/${event.correlationId}`, {
             headers: {
               'Authorization': 'Bearer ' + getToken(),
             },
           }).then(response => {
-            //Informa ao IFood que o pedido foi integrado e confirmado pelo e-PDV.
-             //handleConfirmOrder(event.correlationId);
              const existingOrder = orders.find(order => event.correlationId === order.reference);
              if(existingOrder === null || existingOrder === undefined){
-              //  response.data.map(newOrder => {
-              //   const formattedDate = parseISO(newOrder.createdAt);
-              //   const newDate = format(formattedDate,"dd 'de' MMMM 'de' yyyy 'às' hh:mm", {
-              //     locale: ptBR
-              //   });
-
-              //    return {
-              //      ...newOrder,
-              //      createdAt: newDate
-              //    }
-              //  });
               setOrders([...orders, response.data]);
              }
           });
@@ -74,7 +61,7 @@ const Dashboard = () => {
   });
   
   //Salva os pedidos no banco de dados da Gestor Food
-  //[]
+  //[x]
   const handleCreateOrder = useCallback(async(data) => {
     try {
       await api.post('/orders', {
@@ -119,50 +106,49 @@ const Dashboard = () => {
 
   const handleAcceptOrder = useCallback(async(id) => {
     const createOrder = orders.find(order => order.reference === id);
+    axios.defaults.headers.common = {'Authorization': `Bearer ${getToken()}`}
     try {
-      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/integration`,{
-        headers: {
-          'Authorization': 'Bearer ' + getToken(),
-        }
-      });
-      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/confirmation`,{
-        headers: {
-          'Authorization': 'Bearer ' + getToken(),
-        }
-      });
+      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/integration`);
+      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/confirmation`);
+      alert('O pedido foi confirmado e já está sendo preparado!')
     }catch (err){
       console.log(err);
+      alert('Ocorreu um erro ao aceitar pedido!')
     }
     handleCreateOrder(createOrder);
   }, [getToken, handleCreateOrder, orders]);
 
   //Solicita cancelamento do pedido
-  //[]
-  const handleDeclineOrder = useCallback(async (id) => {
+  //[x]
+  const handleDeclineOrder = useCallback(async(id) => {
     try {
+      axios.defaults.headers.common = {'Authorization': `Bearer ${getToken()}`}
       await axios.post(`https://pos-api.ifood.com.br/v3.0/orders/${id}/statuses/cancellationRequested`, {
-        headers: {
-          'Authorization': 'Bearer ' + getToken(),
-        }
+        cancellationCode: "801",  
+        details: "Problemas em completar o pedido",
       });
-
       alert('Solicitação de cancelamento enviada!')
     }catch (err){
       console.log(err);
     }
-    
   }, [getToken]);
 
+  const renderFormattedDate = useCallback((date) => {
+    const formattedDate = parseISO(date);
+      const newDate = format(formattedDate,"dd 'de' MMMM 'de' yyyy 'às' hh:mm", {
+        locale: ptBR
+      });
+
+        return newDate;
+  }, []);
+
   //Informa que o pedido saiu para entrega
-  //[]
+  //[x]
   const handleDelivery = useCallback(async (id) => {
     try {
-      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/dispatch`, {
-        headers: {
-          'Authorization': 'Bearer ' + getToken(),
-        }
-      });
-      alert('O cliente será informado de que o pedido saiu para entrega!')
+      axios.defaults.headers.common = {'Authorization': `Bearer ${getToken()}`}
+      await axios.post(`https://pos-api.ifood.com.br/v1.0/orders/${id}/statuses/dispatch`);
+      alert('O cliente será informado de que o pedido saiu para entrega!');
     }catch (err){
       console.log(err);
     }
@@ -174,11 +160,12 @@ const Dashboard = () => {
     <Container>
       <Title>Dashboard</Title>
       <OrdersContainer>
+          {orders.length === 0 && (<h1>Nenhum pedido por aqui...</h1>)}
           {orders.map(order => (
             <Order key={order.id}>
               <OrderInfo>
                 <OrderName>{order.name}</OrderName>
-                <OrderTime>{order.createdAt}</OrderTime>
+                <OrderTime>{renderFormattedDate(order.createdAt)}</OrderTime>
                 <OrderClient>Cliente: {order.customer.name}</OrderClient>
                 <OrderClientPhone>Telefone: {order.customer.phone}</OrderClientPhone>
                 {order.items.map(item => (
